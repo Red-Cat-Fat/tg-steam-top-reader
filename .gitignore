@@ -78,7 +78,7 @@ target/
 celerybeat-schedule
 
 # dotenv
-.env
+steam_reader.env
 
 # virtualenv
 venv/

@@ -3,5 +3,6 @@ __pycache__
 *.log
 *.json
 .env
+**/*.env
 venv/
 .idea/

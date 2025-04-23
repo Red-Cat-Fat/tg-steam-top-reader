@@ -1,6 +1,7 @@
 from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
 from telegram.error import TelegramError
 import logging
+import asyncio
 
 
 class TelegramBotManager:
@@ -9,21 +10,56 @@ class TelegramBotManager:
         self.CHAT_ID = chat_id
         self.bot = Bot(token=token)
 
-    async def send_message(self, message, chat_id=-1, reply_markup=None):
-        """Асинхронная отправка сообщения в Telegram"""
-        try:
-            if chat_id < 0:
-                chat_id = self.CHAT_ID
-            await self.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            return True
-        except TelegramError as e:
-            logging.error(f"Ошибка Telegram (send_message): {str(e)}")
-            return False
+    async def send_message(
+            self,
+            message: str,
+            chat_id: int = -1,
+            reply_markup: ReplyKeyboardMarkup = None,
+            max_retries: int = 3,
+            max_length: int = 3000
+    ) -> bool:
+        """Асинхронная отправка сообщения с разбивкой и повторами при ошибках."""
+        if chat_id < 0:
+            chat_id = self.CHAT_ID
+
+        message_parts = self._split_message(message, max_length)
+
+        for part in message_parts:
+            for attempt in range(max_retries):
+                try:
+                    await self.bot.send_message(
+                        chat_id=chat_id,
+                        text=part,
+                        parse_mode='Markdown',
+                        reply_markup=reply_markup
+                    )
+                    break
+                except TelegramError as e:
+                    logging.error(f"Ошибка Telegram (попытка {attempt + 1}): {str(e)}")
+                    if attempt == max_retries - 1:
+                        return False
+                    await asyncio.sleep(2 ** attempt)
+        return True
+
+    @staticmethod
+    def _split_message(message: str, max_length: int) -> list[str]:
+        """Разбивает сообщение на части, не превышающие max_length."""
+        if len(message) <= max_length:
+            return [message]
+
+        parts = []
+        while message:
+            split_pos = max_length
+            if len(message) > max_length:
+                split_pos = message.rfind('\n', 0, max_length)
+                if split_pos == -1:
+                    split_pos = message.rfind(' ', 0, max_length)
+                if split_pos == -1:
+                    split_pos = max_length
+
+            parts.append(message[:split_pos])
+            message = message[split_pos:].lstrip()
+        return parts
 
     @staticmethod
     def get_reply_keyboard():

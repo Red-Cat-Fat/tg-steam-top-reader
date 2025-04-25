@@ -33,14 +33,60 @@ class BotLogic:
         previous_top = self.steam.load_previous_top()
 
         if previous_top:
-            changes = self.steam.compare_tops(previous_top, current_top)
-            if changes:
-                message = "🎮 *Изменения в Steam Топ-10:*\n\n" + "\n".join(changes)
-                await self.telegram.send_message(message)
+            new_game, up_game, down_game, delete_game = self.steam.compare_tops(previous_top, current_top)
+            if not (new_game or up_game or down_game or delete_game):
+                message_lines = "Изменений не обнаружено"
+                self.logging.info(message_lines)
+                await self.telegram.send_message(
+                    message_lines,
+                    reply_markup=self.telegram.get_reply_keyboard())
             else:
-                self.logging.info("Изменений не обнаружено")
+                # 🔼🔽❌🆕
+                message_lines = ["🆕 *Новые игры:*\n\n"]
+                if new_game:
+                    for game_change in new_game:
+                        message_lines.append(str(game_change))
+
+                    final_message = "\n".join(message_lines)
+                    await self.telegram.send_message(
+                        final_message,
+                        reply_markup=self.telegram.get_reply_keyboard())
+                if up_game:
+                    message_lines.clear()
+                    message_lines.append("🔼 *Топ роста:*\n\n")
+                    for game_change in up_game:
+                        message_lines.append(str(game_change))
+
+                    final_message = "\n".join(message_lines)
+                    await self.telegram.send_message(
+                        final_message,
+                        reply_markup=self.telegram.get_reply_keyboard())
+                if down_game:
+                    message_lines.clear()
+                    message_lines.append("🔽 *Топ падения:*\n\n")
+                    for game_change in down_game:
+                        message_lines.append(str(game_change))
+
+                    final_message = "\n".join(message_lines)
+                    await self.telegram.send_message(
+                        final_message,
+                        reply_markup=self.telegram.get_reply_keyboard())
+                if delete_game:
+                    message_lines.clear()
+                    message_lines.append("❌ *Выбывшие игры:*\n\n")
+                    for game_change in delete_game:
+                        message_lines.append(str(game_change))
+
+                    final_message = "\n".join(message_lines)
+                    await self.telegram.send_message(
+                        final_message,
+                        reply_markup=self.telegram.get_reply_keyboard())
         else:
-            self.logging.info("Первая проверка, сохраняем текущий топ")
+            message_lines = "Первая проверка, сохраняем текущий топ"
+            await self.telegram.send_message(
+                message_lines,
+                reply_markup=self.telegram.get_reply_keyboard())
+            self.logging.info(message_lines)
 
         self.steam.save_current_top(current_top)
 
@@ -64,6 +110,12 @@ class BotLogic:
                                 chat_id=chat_id,
                                 reply_markup=self.telegram.get_reply_keyboard()
                             )
+                        elif text in ['Посмотреть изменения с прошлой проверки']:
+                            await self.telegram.send_message(
+                                "Начата проверка, пожалуста подождите...",
+                                chat_id=chat_id,
+                                reply_markup=self.telegram.get_reply_keyboard())
+                            await self.check_and_notify()
                         elif text in ['Изменить частоту проверки']:
                             await self.telegram.send_message(
                                 'Как часто нужно проверять обновления?',
@@ -110,7 +162,7 @@ class BotLogic:
         self.manager.start_scheduler()
 
         # Первая проверка при запуске
-        asyncio.run_coroutine_threadsafe(self.check_and_notify(), loop)
+        # asyncio.run_coroutine_threadsafe(self.check_and_notify(), loop)
 
         # Основной цикл
         while True:

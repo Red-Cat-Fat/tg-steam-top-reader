@@ -23,8 +23,3 @@ if __name__ == "__main__":
 
     bot_logic.main()
     logging.info("Ready to work")
-
-    message = "start"
-    for attempt in range(4000):
-        message += "{0}".format(attempt)
-    telegram_manager.send_message(message)

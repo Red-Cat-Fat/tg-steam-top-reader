@@ -1,6 +1,11 @@
+from random import randrange
+
 import requests
 import json
 import logging
+from typing import List, Tuple
+
+from ChangeGamePosition import UpPosition, DownPosition, DeleteGame, NewGame, ChangeGamePosition
 
 
 class SteamTopManager:
@@ -91,11 +96,19 @@ class SteamTopManager:
         with open(self.DATA_FILE, 'w') as f:
             json.dump(top, f, indent=2)
 
-    def compare_tops(self, prev_top, curr_top):
+    @staticmethod
+    def compare_tops(prev_top, curr_top) -> Tuple[List[NewGame], List[UpPosition], List[DownPosition], List[DeleteGame]]:
         """Сравнивает два топа и возвращает список изменений, отслеживая перемещения игр"""
-        changes = []
+        # Создаём пустой список с указанием типа
+        new_game: List[NewGame] = []
+        up_game: List[UpPosition] = []
+        down_game: List[DownPosition] = []
+        delete_game: List[DeleteGame] = []
 
         # Создаем словари {appid: rank} для быстрого поиска
+        # prev_appid_to_rank = {game['appid']: randrange(1, 1000, 1) for game in prev_top}
+        #  curr_appid_to_rank = {game['appid']: randrange(1, 1000, 1)  for game in curr_top}
+
         prev_appid_to_rank = {game['appid']: game['rank'] for game in prev_top}
         curr_appid_to_rank = {game['appid']: game['rank'] for game in curr_top}
 
@@ -108,7 +121,7 @@ class SteamTopManager:
 
             # Если игры не было в предыдущем топе
             if appid not in prev_appid_to_rank:
-                changes.append(f"🆕 Новая игра в топе: {curr_game['name']} (место {curr_rank})")
+                new_game.append(NewGame(curr_game['name'], curr_rank))
                 continue
 
             prev_rank = prev_appid_to_rank[appid]
@@ -116,24 +129,22 @@ class SteamTopManager:
             # Если ранг изменился
             if prev_rank != curr_rank and appid not in moved_games:
                 moved_games.add(appid)
-                if prev_rank < curr_rank:
-                    changes.append(
-                        f"🔼 Игра поднялась: {curr_game['name']} "
-                        f"(с {prev_rank} места на {curr_rank})"
-                    )
+                if prev_rank > curr_rank:
+                    up_game.append(UpPosition(curr_game['name'], prev_rank, curr_rank))
                 else:
-                    changes.append(
-                        f"🔽 Игра опустилась: {curr_game['name']} "
-                        f"(с {prev_rank} места на {curr_rank})"
-                    )
+                    down_game.append(DownPosition(curr_game['name'], prev_rank, curr_rank))
 
         # Проверяем игры, которые выбыли из топа
         for prev_game in prev_top:
             appid = prev_game['appid']
             if appid not in curr_appid_to_rank:
-                changes.append(f"❌ Игра выбыла из топа: {prev_game['name']} (была на {prev_game['rank']})")
+                delete_game.append(DeleteGame(prev_game['name'], prev_game['rank']))
 
-        return changes
+        return (
+            sorted(new_game, key=lambda x: x.sort_priority),
+            sorted(up_game, key=lambda x: x.sort_priority),
+            sorted(down_game, key=lambda x: x.sort_priority),
+            sorted(delete_game, key=lambda x: x.sort_priority))
 
     def get_top_message(self, count=-1):
         if count < 0:

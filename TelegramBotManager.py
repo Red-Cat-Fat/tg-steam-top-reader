@@ -65,8 +65,9 @@ class TelegramBotManager:
     def get_reply_keyboard():
         """Возвращает клавиатуру с кнопками"""
         keyboard = [
+            [KeyboardButton('Посмотреть изменения с прошлой проверки')],
             [KeyboardButton('Показать текущий топ')],
-            [KeyboardButton('Изменить частоту проверки')],
+            #[KeyboardButton('Изменить частоту проверки')],
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
